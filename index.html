@@ -1,0 +1,1511 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Trip Custodian — Team Efficiency Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg:#f4f5f7; --surface:#fff; --surface2:#f0f2f5; --border:#dde1e7;
+  --text:#1a1d23; --muted:#6b7280; --accent:#2563eb;
+  --green:#16a34a; --green-bg:#dcfce7; --red:#dc2626; --red-bg:#fee2e2;
+  --radius:10px; --shadow:0 1px 4px rgba(0,0,0,.08);
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,sans-serif;min-height:100vh;font-size:14px;}
+
+/* HEADER */
+header{background:var(--surface);border-bottom:1px solid var(--border);padding:13px 28px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:200;box-shadow:var(--shadow);}
+.logo{display:flex;align-items:center;gap:10px;}
+.logo-icon{width:34px;height:34px;background:var(--accent);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:18px;color:#fff;}
+h1{font-size:16px;font-weight:700;}
+.subtitle{font-size:12px;color:var(--muted);}
+.header-right{display:flex;align-items:center;gap:10px;}
+#file-input{display:none;}
+.btn-upload{background:var(--accent);color:#fff;border:none;padding:8px 16px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;}
+.btn-upload:hover{background:#1d4ed8;}
+.data-badge{font-size:12px;background:var(--surface2);border:1px solid var(--border);padding:5px 12px;border-radius:20px;color:var(--muted);}
+
+/* TABS */
+.tabs{display:flex;gap:2px;padding:0 28px;background:var(--surface);border-bottom:2px solid var(--border);overflow-x:auto;}
+.tab{padding:11px 16px;cursor:pointer;font-size:13px;font-weight:600;border:none;background:transparent;color:var(--muted);border-bottom:3px solid transparent;margin-bottom:-2px;white-space:nowrap;transition:.15s;}
+.tab.active{color:var(--accent);border-bottom-color:var(--accent);}
+.tab:hover:not(.active){color:var(--text);background:var(--surface2);}
+
+/* ── MULTI-SELECT FILTER BAR ── */
+.filters{background:var(--surface);border-bottom:1px solid var(--border);padding:10px 28px;display:flex;flex-wrap:wrap;gap:10px;align-items:center;position:relative;z-index:150;}
+.filter-group{display:flex;align-items:center;gap:6px;position:relative;}
+.filter-label{font-size:11px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.4px;}
+
+/* Multi-select pill button */
+.ms-btn{display:flex;align-items:center;gap:5px;background:var(--surface);border:1px solid var(--border);border-radius:7px;padding:5px 10px;cursor:pointer;font-size:13px;color:var(--text);min-width:120px;max-width:200px;user-select:none;}
+.ms-btn:hover,.ms-btn.open{border-color:var(--accent);}
+.ms-btn .ms-label{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.ms-btn .ms-caret{color:var(--muted);font-size:10px;flex-shrink:0;}
+.ms-btn .ms-count{background:var(--accent);color:#fff;border-radius:10px;padding:1px 6px;font-size:11px;font-weight:700;flex-shrink:0;}
+
+/* Dropdown panel */
+.ms-dropdown{display:none;position:absolute;top:calc(100% + 4px);left:0;background:var(--surface);border:1px solid var(--border);border-radius:10px;box-shadow:0 6px 24px rgba(0,0,0,.13);min-width:220px;max-width:280px;z-index:500;overflow:hidden;}
+.ms-dropdown.open{display:block;}
+.ms-search{width:100%;border:none;border-bottom:1px solid var(--border);padding:9px 12px;font-size:13px;outline:none;background:var(--surface2);}
+.ms-actions{display:flex;gap:0;border-bottom:1px solid var(--border);}
+.ms-action-btn{flex:1;background:none;border:none;padding:6px;font-size:11px;font-weight:700;cursor:pointer;color:var(--accent);}
+.ms-action-btn:hover{background:var(--surface2);}
+.ms-list{max-height:220px;overflow-y:auto;}
+.ms-item{display:flex;align-items:center;gap:8px;padding:8px 12px;cursor:pointer;font-size:13px;}
+.ms-item:hover{background:var(--surface2);}
+.ms-item input[type=checkbox]{accent-color:var(--accent);width:14px;height:14px;cursor:pointer;}
+.ms-item label{cursor:pointer;flex:1;}
+
+/* Date range inputs */
+input[type=date]{background:var(--surface);border:1px solid var(--border);color:var(--text);padding:5px 9px;border-radius:7px;font-size:13px;cursor:pointer;}
+input[type=date]:focus{outline:none;border-color:var(--accent);}
+
+.btn-reset{background:transparent;border:1px solid var(--border);color:var(--muted);padding:6px 12px;border-radius:7px;cursor:pointer;font-size:12px;}
+.btn-reset:hover{border-color:var(--accent);color:var(--accent);}
+
+/* PAGES */
+.page{display:none;padding:24px 28px;}
+.page.active{display:block;}
+
+/* KPI */
+.kpi-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(165px,1fr));gap:14px;margin-bottom:22px;}
+.kpi{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px 18px;box-shadow:var(--shadow);}
+.kpi-lbl{font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.4px;}
+.kpi-val{font-size:28px;font-weight:700;margin:6px 0 2px;}
+.kpi-val.green{color:var(--green);}
+.kpi-val.red{color:var(--red);}
+.kpi-val.blue{color:var(--accent);}
+.kpi-sub{font-size:12px;color:var(--muted);}
+
+/* CARDS */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px;box-shadow:var(--shadow);}
+.card-title{font-size:13px;font-weight:700;color:var(--text);margin-bottom:14px;}
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:18px;}
+@media(max-width:900px){.grid-2{grid-template-columns:1fr;}}
+.chart-wrap{position:relative;height:220px;}
+.mb{margin-bottom:18px;}
+
+/* BADGES */
+.badge{display:inline-flex;align-items:center;gap:3px;padding:3px 9px;border-radius:20px;font-size:12px;font-weight:600;}
+.badge.green{background:var(--green-bg);color:var(--green);}
+.badge.red{background:var(--red-bg);color:var(--red);}
+.badge.blue{background:#dbeafe;color:var(--accent);}
+.badge.gray{background:var(--surface2);color:var(--muted);}
+
+/* TABLES */
+.table-wrap{overflow-x:auto;}
+table{width:100%;border-collapse:collapse;font-size:13px;}
+th{background:var(--surface2);color:var(--muted);font-weight:700;font-size:11px;text-transform:uppercase;letter-spacing:.4px;padding:10px 12px;text-align:left;border-bottom:2px solid var(--border);white-space:nowrap;}
+td{padding:10px 12px;border-bottom:1px solid var(--border);color:var(--text);vertical-align:middle;}
+tr:last-child td{border-bottom:none;}
+tr:hover td{background:#f8f9fb;}
+td.num{text-align:right;font-weight:700;}
+
+/* MATRIX TABLE */
+.matrix-tbl{border-collapse:collapse;width:100%;font-size:13px;}
+.matrix-tbl th{background:var(--surface2);border:1px solid var(--border);padding:8px 10px;text-align:center;font-size:11px;font-weight:700;color:var(--muted);white-space:nowrap;}
+.matrix-tbl th.sticky-col{text-align:left;min-width:160px;position:sticky;left:0;z-index:3;}
+.matrix-tbl td{border:1px solid var(--border);padding:0;}
+.matrix-tbl td.name-col{text-align:left;padding:8px 14px;font-weight:600;background:var(--surface);position:sticky;left:0;z-index:1;white-space:nowrap;}
+.matrix-tbl td.total-col{background:#f0f7ff;font-weight:700;color:var(--accent);text-align:center;padding:8px;font-size:14px;}
+.matrix-tbl tfoot td{background:#f0f7ff;font-weight:700;font-size:13px;padding:8px 10px;border-top:2px solid var(--border);text-align:center;}
+.grid-btn{width:100%;height:42px;border:none;background:transparent;cursor:pointer;font-size:14px;font-weight:700;color:var(--text);transition:.12s;display:flex;align-items:center;justify-content:center;}
+.grid-btn.has{background:#eff6ff;color:var(--accent);}
+.grid-btn.has:hover{background:#dbeafe;}
+.grid-btn.empty{color:#d1d5db;cursor:default;font-size:12px;}
+
+/* AGENT CARDS */
+.agent-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;margin-bottom:20px;}
+.agent-card{background:var(--surface);border:2px solid var(--border);border-radius:var(--radius);padding:16px;cursor:pointer;transition:.15s;}
+.agent-card:hover,.agent-card.active{border-color:var(--accent);background:#f0f7ff;}
+.agent-name{font-size:14px;font-weight:700;margin-bottom:6px;}
+.agent-num{font-size:26px;font-weight:700;color:var(--accent);}
+
+/* MODALS */
+.modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:1000;align-items:flex-start;justify-content:center;padding:40px 20px;overflow-y:auto;}
+.modal-bg.open{display:flex;}
+.modal{background:var(--surface);border-radius:14px;width:100%;max-width:860px;box-shadow:0 8px 32px rgba(0,0,0,.18);overflow:hidden;}
+.modal-head{background:var(--surface2);padding:16px 22px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border);}
+.modal-head h2{font-size:15px;font-weight:700;}
+.modal-close{background:none;border:none;font-size:20px;cursor:pointer;color:var(--muted);padding:0 4px;}
+.modal-close:hover{color:var(--text);}
+.modal-body{padding:20px 22px;max-height:72vh;overflow-y:auto;}
+.modal-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:18px;}
+.modal-kpi{background:var(--surface2);border-radius:8px;padding:12px;text-align:center;}
+.modal-kpi .v{font-size:22px;font-weight:700;}
+.modal-kpi .l{font-size:11px;color:var(--muted);margin-top:2px;}
+
+/* PIN MODAL */
+.pin-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:2000;align-items:center;justify-content:center;}
+.pin-bg.open{display:flex;}
+.pin-box{background:var(--surface);border-radius:14px;padding:32px;width:340px;box-shadow:0 8px 32px rgba(0,0,0,.18);}
+.pin-box h2{font-size:17px;font-weight:700;margin-bottom:6px;}
+.pin-box p{color:var(--muted);font-size:13px;margin-bottom:18px;}
+.pin-box input{width:100%;padding:10px 14px;border:1px solid var(--border);border-radius:8px;font-size:14px;color:var(--text);background:var(--surface2);margin-bottom:12px;}
+.pin-box input:focus{outline:none;border-color:var(--accent);}
+.pin-err{color:var(--red);font-size:12px;margin-bottom:10px;display:none;}
+.pin-btns{display:flex;gap:8px;}
+.btn-primary{flex:1;background:var(--accent);color:#fff;border:none;padding:10px;border-radius:8px;cursor:pointer;font-size:14px;font-weight:600;}
+.btn-primary:hover{background:#1d4ed8;}
+.btn-sec{flex:1;background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:10px;border-radius:8px;cursor:pointer;font-size:14px;}
+
+/* TOAST */
+.toast{position:fixed;bottom:24px;right:24px;background:var(--green);color:#fff;padding:12px 20px;border-radius:10px;font-size:13px;font-weight:600;z-index:9999;transform:translateY(80px);opacity:0;transition:.3s;}
+.toast.show{transform:translateY(0);opacity:1;}
+.toast.err{background:var(--red);}
+
+.empty{text-align:center;padding:60px 20px;color:var(--muted);}
+.empty-icon{font-size:44px;margin-bottom:12px;}
+::-webkit-scrollbar{width:6px;height:6px;}
+::-webkit-scrollbar-track{background:var(--bg);}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-icon">✈</div>
+    <div><h1>Trip Custodian Dashboard</h1><div class="subtitle">Team Efficiency Tracker</div></div>
+  </div>
+  <div class="header-right">
+    <div id="data-range-banner" style="display:none;background:#f0f7ff;border:1px solid #bfdbfe;border-radius:8px;padding:5px 14px;font-size:12px;color:var(--accent)">
+      <span style="font-weight:600">Uploaded data:</span> <span id="data-range-text"></span>
+      <span style="color:var(--muted);margin-left:6px" id="data-upload-time"></span>
+    </div>
+    <span class="data-badge" id="data-info">No data loaded</span>
+    <button class="btn-upload" onclick="promptPin()">🔒 Upload Data (PIN)</button>
+    <input type="file" id="file-input" accept=".xlsx,.xls" onchange="handleFile(event)"/>
+  </div>
+</header>
+
+<div class="tabs">
+  <button class="tab active" onclick="switchTab('overview',this)">📊 Overview</button>
+  <button class="tab" onclick="switchTab('daily',this)">📅 Daily Tracker</button>
+  <button class="tab" onclick="switchTab('matrix',this)">🗓️ Date × Custodian</button>
+  <button class="tab" onclick="switchTab('agents',this)">🔎 Agent Drilldown</button>
+  <button class="tab" onclick="switchTab('tasks',this)">✅ Task Analysis</button>
+  <button class="tab" onclick="switchTab('niner',this)">🔍 Niner Check</button>
+  <button class="tab" onclick="switchTab('custodian',this)">👤 By Custodian</button>
+  <button class="tab" onclick="switchTab('detail',this)">📋 Raw Detail</button>
+</div>
+
+<!-- FILTER BAR -->
+<div class="filters" id="filter-bar">
+  <!-- Multi-select filters injected by JS -->
+  <div class="filter-group">
+    <span class="filter-label">Closed Date</span>
+    <input type="date" id="f-closed-from" onchange="applyFilters()"/>
+    <span style="color:var(--muted)">—</span>
+    <input type="date" id="f-closed-to" onchange="applyFilters()"/>
+  </div>
+  <div class="filter-group">
+    <span class="filter-label">Departure</span>
+    <input type="date" id="f-dep-from" onchange="applyFilters()"/>
+    <span style="color:var(--muted)">—</span>
+    <input type="date" id="f-dep-to" onchange="applyFilters()"/>
+  </div>
+  <div class="filter-group">
+    <span class="filter-label">Converted</span>
+    <input type="date" id="f-conv-from" onchange="applyFilters()"/>
+    <span style="color:var(--muted)">—</span>
+    <input type="date" id="f-conv-to" onchange="applyFilters()"/>
+  </div>
+  <button class="btn-reset" onclick="resetFilters()">↺ Reset All</button>
+</div>
+
+<div id="page-overview" class="page active"></div>
+<div id="page-daily" class="page"></div>
+<div id="page-matrix" class="page"></div>
+<div id="page-agents" class="page"></div>
+<div id="page-tasks" class="page"></div>
+<div id="page-niner" class="page"></div>
+<div id="page-custodian" class="page"></div>
+<div id="page-detail" class="page"></div>
+
+<!-- DRILL MODAL -->
+<div class="modal-bg" id="drill-modal">
+  <div class="modal">
+    <div class="modal-head">
+      <div><h2 id="drill-title"></h2><div style="font-size:12px;color:var(--muted);margin-top:2px" id="drill-sub"></div></div>
+      <button class="modal-close" onclick="closeDrill()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="modal-kpis" id="drill-kpis"></div>
+      <div class="table-wrap" id="drill-table"></div>
+    </div>
+  </div>
+</div>
+
+<!-- PIN MODAL -->
+<div class="pin-bg" id="pin-modal">
+  <div class="pin-box">
+    <h2>🔒 PIN Required</h2>
+    <p>Enter the admin PIN to upload data</p>
+    <input type="password" id="pin-input" placeholder="Enter PIN" maxlength="8" onkeydown="if(event.key==='Enter')verifyPin()"/>
+    <div class="pin-err" id="pin-err">Incorrect PIN. Try again.</div>
+    <div class="pin-btns">
+      <button class="btn-sec" onclick="closePin()">Cancel</button>
+      <button class="btn-primary" onclick="verifyPin()">Unlock</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ═══════════════════════════════════════════════
+//  CONFIG
+// ═══════════════════════════════════════════════
+const ADMIN_PIN = '1234';
+const STORAGE_KEY = 'tc_dash_v4';
+
+let allData = [], filteredData = [], charts = {}, currentTab = 'overview';
+
+// Multi-select state: filterKey → Set of selected values (empty = all)
+const msState = { custodian: new Set(), region: new Set(), task: new Set(), overdue: new Set() };
+
+// ═══════════════════════════════════════════════
+//  DATE HELPERS
+// ═══════════════════════════════════════════════
+
+/** Robustly extract YYYY-MM-DD from any date string Excel/XLSX might produce.
+ *  Handles: "2026-04-17 18:54:22", "2026-04-17T18:54:22", "4/17/2026 6:54 PM",
+ *           "17/04/2026", "Apr 17, 2026", serial numbers, etc. */
+function datePart(s) {
+  if (!s) return '';
+  const str = String(s).trim();
+
+  // Already YYYY-MM-DD (with optional time)
+  const iso = str.match(/^(\d{4}-\d{2}-\d{2})/);
+  if (iso) return iso[1];
+
+  // M/D/YYYY or MM/DD/YYYY (US locale from XLSX)
+  const us = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if (us) {
+    const [, m, d, y] = us;
+    return `${y}-${m.padStart(2,'0')}-${d.padStart(2,'0')}`;
+  }
+
+  // D/M/YYYY (non-US)
+  const eu = str.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})/);
+  if (eu) {
+    const [, d, m, y] = eu;
+    return `${y}-${m.padStart(2,'0')}-${d.padStart(2,'0')}`;
+  }
+
+  // Try native Date parse as last resort
+  const dt = new Date(str);
+  if (!isNaN(dt)) {
+    return dt.toISOString().slice(0, 10);
+  }
+  return '';
+}
+
+/** "2026-04-01" → "Apr 1" */
+function fmtDate(s) {
+  if (!s || s === '-') return '-';
+  const d = new Date(s + 'T00:00:00');
+  if (isNaN(d)) return s;
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
+function daysBetween(a, b) {
+  if (!a || !b) return null;
+  const da = new Date(a + 'T00:00:00'), db = new Date(b + 'T00:00:00');
+  if (isNaN(da) || isNaN(db)) return null;
+  return Math.round((db - da) / 864e5);
+}
+function pct(a, b) { return b ? Math.round(a / b * 100) : 0; }
+function destroyChart(id) { if (charts[id]) { charts[id].destroy(); delete charts[id]; } }
+
+// ═══════════════════════════════════════════════
+//  STORAGE & PIN
+// ═══════════════════════════════════════════════
+function loadStoredData() {
+  // Shows a loading indicator while fetching from cloud
+  ['overview','daily','matrix','agents','tasks','niner','custodian','detail'].forEach(t => {
+    const el = document.getElementById('page-' + t);
+    if (el) el.innerHTML = `<div class="empty"><div class="empty-icon" style="font-size:30px;margin-bottom:10px">⏳</div><h3>Loading shared data…</h3><p style="margin-top:6px;font-size:13px;color:var(--muted)">Fetching latest data for your team</p></div>`;
+  });
+  loadSharedData();
+}
+
+// ═══════════════════════════════════════════════
+//  SHARED CLOUD STORAGE — Supabase
+//  Paste your project URL and anon key below.
+//  Upload once → entire team sees it instantly.
+// ═══════════════════════════════════════════════
+const SUPABASE_URL      = 'https://ynzisumrnmztuouyfbeb.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_PUjNMm0jYm...';
+const TABLE_NAME       = 'tc_dashboard_data';          // the table you'll create in Step 1
+
+// Local cache — makes repeat page loads instant while cloud fetch happens in background
+const CACHE_KEY = 'tc_dash_v5_cache';
+
+// ── Supabase REST helpers ────────────────────────
+function sbHeaders(write = false) {
+  const h = {
+    'Content-Type': 'application/json',
+    'apikey': SUPABASE_ANON_KEY,
+    'Authorization': 'Bearer ' + SUPABASE_ANON_KEY
+  };
+  if (write) h['Prefer'] = 'resolution=merge-duplicates';
+  return h;
+}
+
+async function saveData(data) {
+  // 1. Cache locally for fast reload
+  try {
+    localStorage.setItem(CACHE_KEY, JSON.stringify({ data, uploadedAt: new Date().toISOString() }));
+  } catch(e) {}
+
+  // 2. Upsert into Supabase (id=1 is our single shared row)
+  showToast('⏳ Saving for all viewers…');
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/${TABLE_NAME}`, {
+      method: 'POST',
+      headers: { ...sbHeaders(true), 'Prefer': 'resolution=merge-duplicates' },
+      body: JSON.stringify({
+        id: 1,
+        payload: data,
+        uploaded_at: new Date().toISOString(),
+        record_count: data.length
+      })
+    });
+    if (!res.ok) {
+      const err = await res.text();
+      throw new Error(err);
+    }
+    showToast(`✅ Live for all — ${data.length} records uploaded`);
+  } catch(e) {
+    showToast('⚠️ Supabase save failed. Check your URL/key in index.html.', true);
+    console.error('Supabase save error:', e);
+  }
+}
+
+async function loadSharedData() {
+  // Try Supabase first
+  try {
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/${TABLE_NAME}?id=eq.1&select=payload,uploaded_at`,
+      { headers: sbHeaders() }
+    );
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const rows = await res.json();
+    if (rows.length > 0 && Array.isArray(rows[0].payload) && rows[0].payload.length > 0) {
+      allData = rows[0].payload;
+      try { localStorage.setItem(CACHE_KEY, JSON.stringify({ data: allData, uploadedAt: rows[0].uploaded_at })); } catch(e) {}
+      initDashboard(rows[0].uploaded_at);
+      return;
+    }
+  } catch(e) {
+    console.warn('Supabase load failed, trying local cache:', e);
+  }
+
+  // Fallback: local cache
+  try {
+    const cached = localStorage.getItem(CACHE_KEY);
+    if (cached) {
+      const record = JSON.parse(cached);
+      if (record?.data?.length > 0) {
+        allData = record.data;
+        initDashboard(record.uploadedAt);
+        showToast('⚠️ Loaded from local cache — may not be latest', true);
+        return;
+      }
+    }
+  } catch(e) {}
+
+  renderEmpty();
+}
+function promptPin() {
+  document.getElementById('pin-modal').classList.add('open');
+  document.getElementById('pin-input').value = '';
+  document.getElementById('pin-err').style.display = 'none';
+  setTimeout(() => document.getElementById('pin-input').focus(), 100);
+}
+function closePin() { document.getElementById('pin-modal').classList.remove('open'); }
+function verifyPin() {
+  if (document.getElementById('pin-input').value === ADMIN_PIN) {
+    closePin(); document.getElementById('file-input').click();
+  } else { document.getElementById('pin-err').style.display = 'block'; document.getElementById('pin-input').value = ''; }
+}
+
+// ═══════════════════════════════════════════════
+//  FILE UPLOAD
+// ═══════════════════════════════════════════════
+function handleFile(e) {
+  const file = e.target.files[0]; if (!file) return;
+  const reader = new FileReader();
+  reader.onload = async ev => {
+    try {
+      const wb = XLSX.read(ev.target.result, { type: 'binary', cellDates: true });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const raw = XLSX.utils.sheet_to_json(ws, { raw: false, header: 1 });
+      const hIdx = raw.findIndex(r => r.some(c => String(c).trim().toLowerCase() === 'trail_id'));
+      if (hIdx < 0) { showToast('Cannot find header row!', true); return; }
+      const headers = raw[hIdx].map(h => String(h).trim());
+      allData = raw.slice(hIdx + 1).filter(r => r.some(c => c !== null && c !== '')).map(row => {
+        const obj = {};
+        headers.forEach((h, i) => obj[h] = row[i] !== undefined ? String(row[i]).trim() : '');
+        return obj;
+      });
+      initDashboard(new Date().toISOString());
+      await saveData(allData);  // push to cloud for all viewers
+    } catch(err) { showToast('Error: ' + err.message, true); }
+  };
+  reader.readAsBinaryString(file);
+  e.target.value = '';
+}
+
+// ═══════════════════════════════════════════════
+//  MULTI-SELECT WIDGET
+// ═══════════════════════════════════════════════
+const MS_DEFS = [
+  { key: 'custodian', label: 'Custodian', field: 'trip_custodian_name' },
+  { key: 'region',    label: 'Region',    field: 'sub_region' },
+  { key: 'task',      label: 'Task',      field: 'task_name' },
+  { key: 'overdue',   label: 'Status',    field: 'is_overdue',
+    mapLabel: v => v === '0' ? 'On Time' : v === '1' ? 'Overdue' : v }
+];
+
+function buildMultiSelects() {
+  const bar = document.getElementById('filter-bar');
+  const insertBefore = bar.querySelector('.filter-group'); // departure group
+
+  MS_DEFS.forEach(def => {
+    const wrap = document.createElement('div');
+    wrap.className = 'filter-group';
+    wrap.style.position = 'relative';
+    wrap.innerHTML = `
+      <span class="filter-label">${def.label}</span>
+      <div class="ms-btn" id="ms-btn-${def.key}" onclick="toggleMs('${def.key}')">
+        <span class="ms-label" id="ms-lbl-${def.key}">All</span>
+        <span class="ms-caret">▼</span>
+      </div>
+      <div class="ms-dropdown" id="ms-drop-${def.key}">
+        <input class="ms-search" placeholder="Search…" oninput="msSearch('${def.key}',this.value)"/>
+        <div class="ms-actions">
+          <button class="ms-action-btn" onclick="msSelectAll('${def.key}')">All</button>
+          <button class="ms-action-btn" onclick="msClearAll('${def.key}')">None</button>
+        </div>
+        <div class="ms-list" id="ms-list-${def.key}"></div>
+      </div>`;
+    bar.insertBefore(wrap, insertBefore);
+  });
+}
+
+function populateMultiSelects() {
+  MS_DEFS.forEach(def => {
+    const vals = [...new Set(allData.map(d => d[def.field]).filter(v => v !== undefined && v !== ''))].sort();
+    renderMsList(def.key, vals);
+  });
+}
+
+function renderMsList(key, vals) {
+  const def = MS_DEFS.find(d => d.key === key);
+  const list = document.getElementById('ms-list-' + key);
+  list.innerHTML = vals.map(v => {
+    const lbl = def.mapLabel ? def.mapLabel(v) : v;
+    const checked = msState[key].size === 0 || msState[key].has(v) ? '' : '';
+    const isChecked = msState[key].size === 0; // default: all checked visually
+    return `<div class="ms-item">
+      <input type="checkbox" id="ms-cb-${key}-${CSS.escape(v)}" value="${v}"
+        ${msState[key].size === 0 || msState[key].has(v) ? 'checked' : ''}
+        onchange="msToggle('${key}','${v.replace(/'/g,"\\'")}')" />
+      <label for="ms-cb-${key}-${CSS.escape(v)}">${lbl}</label>
+    </div>`;
+  }).join('');
+  list.dataset.vals = JSON.stringify(vals);
+}
+
+function toggleMs(key) {
+  const drop = document.getElementById('ms-drop-' + key);
+  const btn = document.getElementById('ms-btn-' + key);
+  const isOpen = drop.classList.contains('open');
+  // close all
+  document.querySelectorAll('.ms-dropdown').forEach(d => d.classList.remove('open'));
+  document.querySelectorAll('.ms-btn').forEach(b => b.classList.remove('open'));
+  if (!isOpen) { drop.classList.add('open'); btn.classList.add('open'); }
+}
+
+function msSearch(key, q) {
+  const list = document.getElementById('ms-list-' + key);
+  const vals = JSON.parse(list.dataset.vals || '[]');
+  const filtered = q ? vals.filter(v => v.toLowerCase().includes(q.toLowerCase())) : vals;
+  const def = MS_DEFS.find(d => d.key === key);
+  list.innerHTML = filtered.map(v => {
+    const lbl = def.mapLabel ? def.mapLabel(v) : v;
+    return `<div class="ms-item">
+      <input type="checkbox" id="ms-cb-${key}-${CSS.escape(v)}" value="${v}"
+        ${msState[key].size === 0 || msState[key].has(v) ? 'checked' : ''}
+        onchange="msToggle('${key}','${v.replace(/'/g,"\\'")}')" />
+      <label for="ms-cb-${key}-${CSS.escape(v)}">${lbl}</label>
+    </div>`;
+  }).join('');
+}
+
+function msToggle(key, val) {
+  const list = document.getElementById('ms-list-' + key);
+  const allVals = JSON.parse(list.dataset.vals || '[]');
+  // When nothing is selected yet (all mode), transition to explicit mode
+  if (msState[key].size === 0) {
+    // Switch to explicit: add all, then remove the unchecked one
+    allVals.forEach(v => msState[key].add(v));
+  }
+  if (msState[key].has(val)) msState[key].delete(val); else msState[key].add(val);
+  // If all selected, revert to "all" mode
+  if (msState[key].size === allVals.length) msState[key].clear();
+  updateMsLabel(key);
+  // Refresh checkboxes
+  allVals.forEach(v => {
+    const cb = document.getElementById('ms-cb-' + key + '-' + CSS.escape(v));
+    if (cb) cb.checked = msState[key].size === 0 || msState[key].has(v);
+  });
+  applyFilters();
+}
+
+function msSelectAll(key) {
+  msState[key].clear();
+  const list = document.getElementById('ms-list-' + key);
+  list.querySelectorAll('input[type=checkbox]').forEach(cb => cb.checked = true);
+  updateMsLabel(key); applyFilters();
+}
+
+function msClearAll(key) {
+  // "None" = keep none selected = show nothing; we treat it as explicitly empty
+  const list = document.getElementById('ms-list-' + key);
+  const allVals = JSON.parse(list.dataset.vals || '[]');
+  // Put all in state then clear = actually deselect all; use sentinel
+  msState[key] = new Set(['__NONE__']);
+  list.querySelectorAll('input[type=checkbox]').forEach(cb => cb.checked = false);
+  updateMsLabel(key); applyFilters();
+}
+
+function updateMsLabel(key) {
+  const lbl = document.getElementById('ms-lbl-' + key);
+  const btn = document.getElementById('ms-btn-' + key);
+  const def = MS_DEFS.find(d => d.key === key);
+
+  // Remove old count badge
+  const old = btn.querySelector('.ms-count'); if (old) old.remove();
+
+  if (msState[key].size === 0) {
+    lbl.textContent = 'All';
+  } else if (msState[key].has('__NONE__')) {
+    lbl.textContent = 'None';
+  } else {
+    const selected = [...msState[key]];
+    const labels = selected.map(v => def.mapLabel ? def.mapLabel(v) : v);
+    lbl.textContent = labels.length === 1 ? labels[0] : `${labels.length} selected`;
+    const badge = document.createElement('span');
+    badge.className = 'ms-count';
+    badge.textContent = labels.length;
+    btn.appendChild(badge);
+  }
+}
+
+// Close dropdowns when clicking outside
+document.addEventListener('click', e => {
+  if (!e.target.closest('.filter-group')) {
+    document.querySelectorAll('.ms-dropdown').forEach(d => d.classList.remove('open'));
+    document.querySelectorAll('.ms-btn').forEach(b => b.classList.remove('open'));
+  }
+});
+
+// ═══════════════════════════════════════════════
+//  INIT & FILTERS
+// ═══════════════════════════════════════════════
+function initDashboard(uploadedAt) {
+  populateMultiSelects();
+  applyFilters();
+  document.getElementById('data-info').textContent = `${allData.length} records`;
+
+  // Compute closed date range from uploaded data
+  const closedDates = allData.map(d => datePart(d.closed_at)).filter(Boolean).sort();
+  if (closedDates.length) {
+    const minD = closedDates[0];
+    const maxD = closedDates[closedDates.length - 1];
+    document.getElementById('data-range-text').textContent =
+      `Closed dates ${fmtDate(minD)} – ${fmtDate(maxD)}  ·  ${allData.length} records`;
+
+    if (uploadedAt) {
+      const d = new Date(uploadedAt);
+      const timeStr = isNaN(d) ? uploadedAt :
+        d.toLocaleDateString('en-US',{month:'short',day:'numeric'}) + ' at ' +
+        d.toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'});
+      document.getElementById('data-upload-time').textContent = `Uploaded ${timeStr}`;
+    }
+    document.getElementById('data-range-banner').style.display = 'block';
+  }
+}
+
+function applyFilters() {
+  if (!allData.length) return;
+  const closedFrom = document.getElementById('f-closed-from').value;
+  const closedTo   = document.getElementById('f-closed-to').value;
+  const depFrom    = document.getElementById('f-dep-from').value;
+  const depTo      = document.getElementById('f-dep-to').value;
+  const convFrom   = document.getElementById('f-conv-from').value;
+  const convTo     = document.getElementById('f-conv-to').value;
+
+  filteredData = allData.filter(d => {
+    // Multi-select filters
+    for (const def of MS_DEFS) {
+      const sel = msState[def.key];
+      if (sel.has('__NONE__')) return false;
+      if (sel.size > 0 && !sel.has(d[def.field])) return false;
+    }
+    // Date range filters
+    const closed = datePart(d.closed_at);
+    const dep    = datePart(d.departure_date);
+    const conv   = datePart(d.Converted_date);
+    if (closedFrom && closed && closed < closedFrom) return false;
+    if (closedTo   && closed && closed > closedTo)   return false;
+    if (depFrom    && dep    && dep    < depFrom)     return false;
+    if (depTo      && dep    && dep    > depTo)       return false;
+    if (convFrom   && conv   && conv   < convFrom)    return false;
+    if (convTo     && conv   && conv   > convTo)      return false;
+    return true;
+  });
+  renderCurrentTab();
+}
+
+function resetFilters() {
+  MS_DEFS.forEach(def => {
+    msState[def.key] = new Set();
+    updateMsLabel(def.key);
+    const list = document.getElementById('ms-list-' + def.key);
+    if (list) list.querySelectorAll('input[type=checkbox]').forEach(cb => cb.checked = true);
+  });
+  ['f-closed-from','f-closed-to','f-dep-from','f-dep-to','f-conv-from','f-conv-to']
+    .forEach(id => document.getElementById(id).value = '');
+  applyFilters();
+}
+
+// ═══════════════════════════════════════════════
+//  TABS
+// ═══════════════════════════════════════════════
+function switchTab(name, btn) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  btn.classList.add('active');
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById('page-' + name).classList.add('active');
+  currentTab = name; renderCurrentTab();
+}
+function renderCurrentTab() {
+  if (!allData.length) { renderEmpty(); return; }
+  ({ overview: renderOverview, daily: renderDaily, matrix: renderMatrix,
+     agents: renderAgents, tasks: renderTasks, niner: renderNiner,
+     custodian: renderCustodian, detail: renderDetail })[currentTab]?.();
+}
+function renderEmpty() {
+  ['overview','daily','matrix','agents','tasks','niner','custodian','detail'].forEach(t => {
+    document.getElementById('page-' + t).innerHTML = `<div class="empty"><div class="empty-icon">📤</div><h3 style="margin-bottom:8px">No Data Loaded</h3><p>Click <strong>"Upload Data (PIN)"</strong> to load your Excel export.</p></div>`;
+  });
+}
+
+// ═══════════════════════════════════════════════
+//  OVERVIEW
+// ═══════════════════════════════════════════════
+function renderOverview() {
+  const data = filteredData;
+  const total  = data.length;
+  const onTime = data.filter(d => String(d.is_overdue) === '0').length;
+  const overdue= data.filter(d => String(d.is_overdue) === '1').length;
+  const trails = [...new Set(data.map(d => d.trail_id).filter(Boolean))].length;
+  const custs  = [...new Set(data.map(d => d.trip_custodian_name).filter(Boolean))].length;
+
+  const taskCounts = {};
+  data.forEach(d => { if (d.task_name) taskCounts[d.task_name] = (taskCounts[d.task_name]||0)+1; });
+
+  // Use datePart(closed_at) — strips time, groups by calendar day only
+  const dailyCounts = {};
+  data.forEach(d => { const dt = datePart(d.closed_at); if (dt) dailyCounts[dt] = (dailyCounts[dt]||0)+1; });
+  const sortedDays = Object.keys(dailyCounts).sort().slice(-14);
+
+  const custMap = {};
+  data.forEach(d => {
+    const c = d.trip_custodian_name; if (!c) return;
+    if (!custMap[c]) custMap[c] = { total: 0, onTime: 0 };
+    custMap[c].total++;
+    if (String(d.is_overdue) === '0') custMap[c].onTime++;
+  });
+  const topCusts = Object.entries(custMap).sort((a,b) => b[1].total - a[1].total);
+
+  document.getElementById('page-overview').innerHTML = `
+    <div class="kpi-grid">
+      <div class="kpi"><div class="kpi-lbl">Total Tasks Closed</div><div class="kpi-val blue">${total}</div><div class="kpi-sub">All custodians</div></div>
+      <div class="kpi"><div class="kpi-lbl">On Time</div><div class="kpi-val green">${onTime}</div><div class="kpi-sub">${pct(onTime,total)}% of total</div></div>
+      <div class="kpi"><div class="kpi-lbl">Overdue</div><div class="kpi-val red">${overdue}</div><div class="kpi-sub">${pct(overdue,total)}% of total</div></div>
+      <div class="kpi"><div class="kpi-lbl">Unique Trails</div><div class="kpi-val blue">${trails}</div><div class="kpi-sub">distinct trip IDs</div></div>
+      <div class="kpi"><div class="kpi-lbl">Custodians</div><div class="kpi-val blue">${custs}</div><div class="kpi-sub">active in period</div></div>
+    </div>
+
+    <!-- 1. Custodian Performance + Task Breakdown — TOP -->
+    <div class="grid-2 mb">
+      <div class="card"><div class="card-title">Custodian Performance Summary</div>
+        <div class="table-wrap"><table>
+          <thead><tr><th>Custodian</th><th>Total</th><th>On Time</th><th>Overdue</th><th>OT%</th></tr></thead>
+          <tbody>${topCusts.map(([name,s]) => {
+            const p = pct(s.onTime, s.total);
+            return `<tr><td><strong>${name}</strong></td><td class="num">${s.total}</td>
+              <td><span class="badge green">${s.onTime}</span></td>
+              <td><span class="badge red">${s.total-s.onTime}</span></td>
+              <td><span class="badge ${p>=70?'green':p>=40?'blue':'red'}">${p}%</span></td></tr>`;
+          }).join('')}</tbody>
+        </table></div>
+      </div>
+      <div class="card"><div class="card-title">Task Type Breakdown</div><div class="chart-wrap"><canvas id="ch-tasks"></canvas></div></div>
+    </div>
+
+    <!-- 2. Daily Trend + Donut — BELOW -->
+    <div class="grid-2">
+      <div class="card"><div class="card-title">Daily Closures — last 14 days</div><div class="chart-wrap"><canvas id="ch-trend"></canvas></div></div>
+      <div class="card"><div class="card-title">On Time vs Overdue</div><div class="chart-wrap"><canvas id="ch-donut"></canvas></div></div>
+    </div>`;
+
+  destroyChart('trend');
+  charts['trend'] = new Chart(document.getElementById('ch-trend'), {
+    type: 'line',
+    data: { labels: sortedDays.map(fmtDate), datasets: [{ label: 'Closures',
+      data: sortedDays.map(d => dailyCounts[d]),
+      borderColor: '#2563eb', backgroundColor: 'rgba(37,99,235,.08)', fill:true, tension:.4, pointRadius:4, pointBackgroundColor:'#2563eb' }] },
+    options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}},
+      scales:{ x:{ticks:{color:'#6b7280'},grid:{color:'#e5e7eb'}}, y:{ticks:{color:'#6b7280'},grid:{color:'#e5e7eb'},beginAtZero:true} } }
+  });
+
+  destroyChart('donut');
+  charts['donut'] = new Chart(document.getElementById('ch-donut'), {
+    type: 'doughnut',
+    data: { labels:['On Time','Overdue'], datasets:[{ data:[onTime,overdue], backgroundColor:['#16a34a','#dc2626'], borderWidth:3, borderColor:'#fff' }] },
+    options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{labels:{color:'#1a1d23',font:{size:13}}}} }
+  });
+
+  destroyChart('tasks-ov');
+  charts['tasks-ov'] = new Chart(document.getElementById('ch-tasks'), {
+    type: 'bar',
+    data: { labels: Object.keys(taskCounts).map(t=>t.replace(/_/g,' ')),
+      datasets: [{ label:'Count', data:Object.values(taskCounts), backgroundColor:'#2563eb', borderRadius:5 }] },
+    options: { responsive:true, maintainAspectRatio:false, indexAxis:'y', plugins:{legend:{display:false}},
+      scales:{ x:{ticks:{color:'#6b7280'},grid:{color:'#e5e7eb'}}, y:{ticks:{color:'#6b7280'},grid:{display:false}} } }
+  });
+}
+
+// ═══════════════════════════════════════════════
+//  DAILY TRACKER
+// ═══════════════════════════════════════════════
+function renderDaily() {
+  const data = filteredData.length ? filteredData : (allData.length ? allData : []);
+
+  if (!data.length) {
+    document.getElementById('page-daily').innerHTML = `<div class="empty"><div class="empty-icon">📭</div><h3>No data matches current filters</h3></div>`;
+    return;
+  }
+
+  // ── Build per-date × per-custodian summary ──
+  const map = {};
+  let skipped = 0;
+  data.forEach(d => {
+    const dt = datePart(d.closed_at);
+    if (!dt) { skipped++; return; }
+    const cust = d.trip_custodian_name || 'Unknown';
+    const key  = dt + '|' + cust;
+    if (!map[key]) map[key] = { date:dt, custodian:cust, total:0, onTime:0, overdue:0, tasks:{} };
+    map[key].total++;
+    if (String(d.is_overdue) === '0') map[key].onTime++; else map[key].overdue++;
+    const tn = d.task_name || 'Unknown';
+    map[key].tasks[tn] = (map[key].tasks[tn] || 0) + 1;
+  });
+  const rows = Object.values(map).sort((a,b) => b.date.localeCompare(a.date) || a.custodian.localeCompare(b.custodian));
+
+  // ── Daily totals for stacked chart ──
+  const dailyMap = {};
+  data.forEach(d => {
+    const dt = datePart(d.closed_at); if (!dt) return;
+    if (!dailyMap[dt]) dailyMap[dt] = { onTime:0, overdue:0 };
+    if (String(d.is_overdue) === '0') dailyMap[dt].onTime++; else dailyMap[dt].overdue++;
+  });
+  const days = Object.keys(dailyMap).sort();
+
+  // ── Task-level summary ──
+  const taskTotals = {};
+  data.forEach(d => {
+    const tn = d.task_name || 'Unknown';
+    if (!taskTotals[tn]) taskTotals[tn] = { total:0, onTime:0, overdue:0 };
+    taskTotals[tn].total++;
+    if (String(d.is_overdue) === '0') taskTotals[tn].onTime++; else taskTotals[tn].overdue++;
+  });
+  const taskRows = Object.entries(taskTotals).sort((a,b) => b[1].total - a[1].total);
+
+  const ot  = data.filter(d=>String(d.is_overdue)==='0').length;
+  const od  = data.filter(d=>String(d.is_overdue)==='1').length;
+
+  // Sample closed_at for debugging display
+  const sampleClosed = data.slice(0,3).map(d=>d.closed_at||'empty').join(' | ');
+
+  document.getElementById('page-daily').innerHTML = `
+    <!-- KPIs -->
+    <div class="kpi-grid" style="margin-bottom:20px">
+      <div class="kpi"><div class="kpi-lbl">Total Closed</div><div class="kpi-val blue">${data.length}</div><div class="kpi-sub">in filtered period</div></div>
+      <div class="kpi"><div class="kpi-lbl">On Time</div><div class="kpi-val green">${ot}</div><div class="kpi-sub">${pct(ot,data.length)}% of total</div></div>
+      <div class="kpi"><div class="kpi-lbl">Overdue</div><div class="kpi-val red">${od}</div><div class="kpi-sub">${pct(od,data.length)}% of total</div></div>
+      <div class="kpi"><div class="kpi-lbl">Active Days</div><div class="kpi-val blue">${days.length}</div><div class="kpi-sub">unique closed dates</div></div>
+      <div class="kpi"><div class="kpi-lbl">Unique Tasks</div><div class="kpi-val blue">${taskRows.length}</div><div class="kpi-sub">task types</div></div>
+    </div>
+
+    <!-- Per-date per-custodian detail FIRST -->
+    <div class="card mb">
+      <div class="card-title">Daily Closures by Date & Custodian
+        <span style="font-size:11px;font-weight:400;color:var(--muted);margin-left:8px">${rows.length} rows · ${skipped>0?`${skipped} rows skipped (no closed date)`:'all rows have closed date'}</span>
+      </div>
+      ${rows.length === 0 ? `
+        <div style="padding:30px;text-align:center;color:var(--muted)">
+          <div style="font-size:32px;margin-bottom:8px">⚠️</div>
+          <div style="font-weight:600;margin-bottom:4px">No rows could be grouped by date</div>
+          <div style="font-size:12px">Sample closed_at values: <code style="background:var(--surface2);padding:2px 6px;border-radius:4px">${sampleClosed}</code></div>
+        </div>` : `
+      <div class="table-wrap"><table>
+        <thead><tr>
+          <th>Date</th><th>Custodian</th><th>Total</th>
+          <th>On Time</th><th>Overdue</th><th>OT %</th>
+          ${taskRows.map(([t])=>`<th style="font-size:10px">${t.replace(/_/g,' ')}</th>`).join('')}
+        </tr></thead>
+        <tbody>
+          ${rows.map(r => {
+            const p = pct(r.onTime, r.total);
+            return `<tr>
+              <td><strong>${fmtDate(r.date)}</strong></td>
+              <td>${r.custodian}</td>
+              <td class="num"><strong>${r.total}</strong></td>
+              <td><span class="badge green">✓ ${r.onTime}</span></td>
+              <td><span class="badge red">✕ ${r.overdue}</span></td>
+              <td><span class="badge ${p>=70?'green':p>=40?'blue':'red'}">${p}%</span></td>
+              ${taskRows.map(([t]) => {
+                const v = r.tasks[t] || 0;
+                return `<td style="text-align:center;color:${v?'var(--text)':'#d1d5db'}">${v || '—'}</td>`;
+              }).join('')}
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table></div>`}
+    </div>
+
+    <!-- Task count summary -->
+    <div class="card mb">
+      <div class="card-title">Tasks Closed — Summary by Task Type</div>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Task</th><th>Total Closed</th><th>On Time</th><th>Overdue</th><th>OT %</th></tr></thead>
+        <tbody>
+          ${taskRows.map(([task, s]) => {
+            const p = pct(s.onTime, s.total);
+            return `<tr>
+              <td><strong>${task.replace(/_/g,' ')}</strong></td>
+              <td class="num"><strong>${s.total}</strong></td>
+              <td><span class="badge green">✓ ${s.onTime}</span></td>
+              <td><span class="badge red">✕ ${s.overdue}</span></td>
+              <td><span class="badge ${p>=70?'green':p>=40?'blue':'red'}">${p}%</span></td>
+            </tr>`;
+          }).join('')}
+          <tr style="background:#f0f7ff;font-weight:700;border-top:2px solid var(--border)">
+            <td>GRAND TOTAL</td>
+            <td class="num">${data.length}</td>
+            <td><span class="badge green">✓ ${ot}</span></td>
+            <td><span class="badge red">✕ ${od}</span></td>
+            <td><span class="badge blue">${pct(ot,data.length)}%</span></td>
+          </tr>
+        </tbody>
+      </table></div>
+    </div>
+
+    <!-- Stacked bar chart at bottom -->
+    <div class="card">
+      <div class="card-title">Daily Closures — On Time vs Overdue (by Closed Date)</div>
+      <div class="chart-wrap" style="height:200px"><canvas id="ch-daily-stacked"></canvas></div>
+    </div>`;
+
+  destroyChart('daily-stacked');
+  if (days.length > 0) {
+    charts['daily-stacked'] = new Chart(document.getElementById('ch-daily-stacked'), {
+      type: 'bar',
+      data: { labels: days.map(fmtDate),
+        datasets: [
+          { label:'On Time', data:days.map(d=>dailyMap[d].onTime),  backgroundColor:'#16a34a', borderRadius:4 },
+          { label:'Overdue', data:days.map(d=>dailyMap[d].overdue), backgroundColor:'#dc2626', borderRadius:4 }
+        ]
+      },
+      options: { responsive:true, maintainAspectRatio:false,
+        plugins:{ legend:{labels:{color:'#1a1d23'}},
+          tooltip:{ callbacks:{ footer: items => `Total: ${items.reduce((s,i)=>s+i.parsed.y,0)}` } }
+        },
+        scales:{
+          x:{ stacked:true, ticks:{color:'#6b7280'}, grid:{color:'#e5e7eb'} },
+          y:{ stacked:true, ticks:{color:'#6b7280',stepSize:1}, grid:{color:'#e5e7eb'}, beginAtZero:true }
+        }
+      }
+    });
+  }
+}
+
+// ═══════════════════════════════════════════════
+//  DATE × CUSTODIAN MATRIX
+// ═══════════════════════════════════════════════
+function renderMatrix() {
+  const data = filteredData;
+  const custodians = [...new Set(data.map(d=>d.trip_custodian_name).filter(Boolean))].sort();
+
+  const lookup = {};      // date → custodian → count
+  const dateTotals = {};
+  const custTotals = {};
+
+  data.forEach(d => {
+    const dt = datePart(d.closed_at); if (!dt) return;   // ← strips time, groups by DAY only
+    const c = d.trip_custodian_name||'Unknown';
+    if (!lookup[dt]) lookup[dt] = {};
+    lookup[dt][c] = (lookup[dt][c]||0)+1;
+    dateTotals[dt] = (dateTotals[dt]||0)+1;
+    custTotals[c]  = (custTotals[c] ||0)+1;
+  });
+  const dates = Object.keys(lookup).sort();  // unique calendar dates, sorted
+
+  document.getElementById('page-matrix').innerHTML = `
+    <div style="margin-bottom:14px">
+      <div style="font-size:15px;font-weight:700;margin-bottom:4px">Daily Closures — Date vs Custodian</div>
+      <div style="color:var(--muted);font-size:13px">Each number = tasks closed on that day by that custodian. Click any number to see the task list.</div>
+    </div>
+    <div class="card mb"><div class="card-title">Total Closures Per Day (by closed date)</div>
+      <div class="chart-wrap" style="height:180px"><canvas id="ch-matrix-bar"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-title" style="margin-bottom:10px">Closures by Date × Custodian &nbsp;<span style="font-size:12px;font-weight:400;color:var(--muted)">Click a number to view task details</span></div>
+      <div style="overflow-x:auto">
+        <table class="matrix-tbl">
+          <thead>
+            <tr>
+              <th class="sticky-col">Custodian</th>
+              ${dates.map(d=>`<th>${fmtDate(d)}</th>`).join('')}
+              <th>Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${custodians.map(c=>`
+              <tr>
+                <td class="name-col">${c}</td>
+                ${dates.map(dt=>{
+                  const v=(lookup[dt]&&lookup[dt][c])||0;
+                  if(!v) return `<td><button class="grid-btn empty" disabled>—</button></td>`;
+                  return `<td><button class="grid-btn has" onclick="openDrill('${c.replace(/'/g,"\\'")}','${dt}')" title="${c} · ${fmtDate(dt)} · ${v} tasks">${v}</button></td>`;
+                }).join('')}
+                <td class="total-col">${custTotals[c]||0}</td>
+              </tr>`).join('')}
+          </tbody>
+          <tfoot>
+            <tr>
+              <td class="name-col" style="font-weight:700;color:var(--muted)">Daily Total</td>
+              ${dates.map(dt=>`<td style="font-weight:700;color:var(--accent);border:1px solid var(--border);text-align:center;padding:8px">${dateTotals[dt]}</td>`).join('')}
+              <td style="font-weight:700;color:var(--accent);border:1px solid var(--border);text-align:center;padding:8px">${data.length}</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>`;
+
+  destroyChart('matrix-bar');
+  charts['matrix-bar'] = new Chart(document.getElementById('ch-matrix-bar'), {
+    type: 'bar',
+    data: { labels: dates.map(fmtDate), datasets:[{ label:'Total Closed',
+      data:dates.map(d=>dateTotals[d]||0), backgroundColor:'#2563eb', borderRadius:5 }] },
+    options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}},
+      scales:{ x:{ticks:{color:'#6b7280'},grid:{color:'#e5e7eb'}}, y:{ticks:{color:'#6b7280',stepSize:1},grid:{color:'#e5e7eb'},beginAtZero:true} },
+      onClick: (evt,els)=>{ if(els.length) openDrill(null, dates[els[0].index]); }
+    }
+  });
+}
+
+// ═══════════════════════════════════════════════
+//  AGENT DRILLDOWN PAGE
+// ═══════════════════════════════════════════════
+function renderAgents() {
+  const data = filteredData;
+  const custodians = [...new Set(data.map(d=>d.trip_custodian_name).filter(Boolean))].sort();
+
+  document.getElementById('page-agents').innerHTML = `
+    <div style="margin-bottom:14px">
+      <div style="font-size:15px;font-weight:700;margin-bottom:4px">Agent Drilldown</div>
+      <div style="color:var(--muted);font-size:13px">Click an agent card to expand and see all their closed tasks</div>
+    </div>
+    <div class="agent-grid">
+      ${custodians.map(c=>{
+        const cd=data.filter(d=>d.trip_custodian_name===c);
+        const ot=cd.filter(d=>String(d.is_overdue)==='0').length;
+        const p=pct(ot,cd.length);
+        return `<div class="agent-card" id="ac-${c.replace(/\s/g,'_')}" onclick="expandAgent('${c.replace(/'/g,"\\'")}')">
+          <div class="agent-name">${c}</div>
+          <div class="agent-num">${cd.length}</div>
+          <div style="font-size:12px;color:var(--muted);margin-bottom:10px">tasks closed</div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap">
+            <span class="badge green">✓ ${ot}</span>
+            <span class="badge red">✕ ${cd.length-ot}</span>
+            <span class="badge blue">${p}% OT</span>
+          </div>
+        </div>`;
+      }).join('')}
+    </div>
+    <div id="agent-detail"></div>`;
+}
+
+// active task filter per agent (stored outside so filter buttons can update it)
+let agentTaskFilter = new Set(); // empty = all tasks
+let agentCurrentCustodian = '';
+
+function expandAgent(custodian) {
+  agentCurrentCustodian = custodian;
+  agentTaskFilter = new Set(); // reset task filter on new agent
+
+  document.querySelectorAll('.agent-card').forEach(c=>c.classList.remove('active'));
+  const card = document.getElementById('ac-' + custodian.replace(/\s/g,'_'));
+  if (card) card.classList.add('active');
+
+  renderAgentDetail(custodian);
+  document.getElementById('agent-detail').scrollIntoView({behavior:'smooth', block:'start'});
+}
+
+function renderAgentDetail(custodian) {
+  const allAgentData = filteredData.filter(d => d.trip_custodian_name === custodian);
+  // All available tasks for this agent
+  const allTasks = [...new Set(allAgentData.map(d => d.task_name).filter(Boolean))].sort();
+
+  // Apply task filter
+  const data = agentTaskFilter.size > 0
+    ? allAgentData.filter(d => agentTaskFilter.has(d.task_name))
+    : allAgentData;
+
+  const onTime  = data.filter(d => String(d.is_overdue) === '0').length;
+  const overdue = data.filter(d => String(d.is_overdue) === '1').length;
+
+  const dailyMap = {};
+  data.forEach(d => { const dt = datePart(d.closed_at); if (dt) dailyMap[dt] = (dailyMap[dt]||0)+1; });
+  const days = Object.keys(dailyMap).sort();
+
+  const taskMap = {};
+  data.forEach(d => { const tn = d.task_name||'Unknown'; taskMap[tn] = (taskMap[tn]||0)+1; });
+
+  const uid = custodian.replace(/\s/g,'_');
+
+  document.getElementById('agent-detail').innerHTML = `
+    <div class="card" style="margin-top:16px">
+
+      <!-- Header -->
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid var(--border)">
+        <div>
+          <div style="font-size:16px;font-weight:700">${custodian}</div>
+          <div style="font-size:12px;color:var(--muted);margin-top:2px">${data.length} tasks shown · ${days.length} active days</div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <span class="badge green">✓ ${onTime} on time</span>
+          <span class="badge red">✕ ${overdue} overdue</span>
+          <span class="badge blue">${pct(onTime,data.length)}% OT</span>
+          <button onclick="document.getElementById('agent-detail').innerHTML='';agentCurrentCustodian=''"
+            style="background:var(--surface2);border:1px solid var(--border);color:var(--muted);padding:5px 10px;border-radius:7px;cursor:pointer;font-size:12px;">✕ Close</button>
+        </div>
+      </div>
+
+      <!-- Task filter chips -->
+      <div style="margin-bottom:16px">
+        <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px">Filter by Task</div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px">
+          <button onclick="agentFilterTask('__ALL__','${uid}')"
+            style="padding:5px 14px;border-radius:20px;border:2px solid ${agentTaskFilter.size===0?'var(--accent)':'var(--border)'};
+                   background:${agentTaskFilter.size===0?'#dbeafe':'var(--surface)'};
+                   color:${agentTaskFilter.size===0?'var(--accent)':'var(--muted)'};
+                   font-size:12px;font-weight:700;cursor:pointer;">
+            All (${allAgentData.length})
+          </button>
+          ${allTasks.map(t => {
+            const cnt = allAgentData.filter(d=>d.task_name===t).length;
+            const active = agentTaskFilter.has(t);
+            return `<button onclick="agentFilterTask('${t.replace(/'/g,"\\'")}','${uid}')"
+              style="padding:5px 14px;border-radius:20px;border:2px solid ${active?'var(--accent)':'var(--border)'};
+                     background:${active?'#dbeafe':'var(--surface)'};
+                     color:${active?'var(--accent)':'var(--muted)'};
+                     font-size:12px;font-weight:700;cursor:pointer;">
+              ${t.replace(/_/g,' ')} (${cnt})
+            </button>`;
+          }).join('')}
+        </div>
+      </div>
+
+      <!-- Charts -->
+      <div class="grid-2 mb">
+        <div><div class="card-title">Daily Closures${agentTaskFilter.size>0?' — filtered':''}</div>
+          <div style="height:180px;position:relative"><canvas id="ch-ag-d-${uid}"></canvas></div>
+        </div>
+        <div><div class="card-title">Task Mix${agentTaskFilter.size>0?' — filtered':''}</div>
+          <div style="height:180px;position:relative"><canvas id="ch-ag-t-${uid}"></canvas></div>
+        </div>
+      </div>
+
+      <!-- Task count summary for this agent -->
+      <div style="margin-bottom:16px">
+        <div class="card-title">Task Count Summary</div>
+        <div class="table-wrap"><table>
+          <thead><tr><th>Task</th><th>Total</th><th>On Time</th><th>Overdue</th><th>OT%</th></tr></thead>
+          <tbody>${Object.entries(taskMap).sort((a,b)=>b[1]-a[1]).map(([task, cnt]) => {
+            const ot = data.filter(d=>d.task_name===task&&String(d.is_overdue)==='0').length;
+            const od = cnt - ot;
+            const p  = pct(ot, cnt);
+            return `<tr>
+              <td><strong>${task.replace(/_/g,' ')}</strong></td>
+              <td class="num"><strong>${cnt}</strong></td>
+              <td><span class="badge green">✓ ${ot}</span></td>
+              <td><span class="badge red">✕ ${od}</span></td>
+              <td><span class="badge ${p>=70?'green':p>=40?'blue':'red'}">${p}%</span></td>
+            </tr>`;
+          }).join('')}
+          <tr style="background:#f0f7ff;font-weight:700">
+            <td>TOTAL</td><td class="num">${data.length}</td>
+            <td><span class="badge green">✓ ${onTime}</span></td>
+            <td><span class="badge red">✕ ${overdue}</span></td>
+            <td><span class="badge blue">${pct(onTime,data.length)}%</span></td>
+          </tr>
+          </tbody>
+        </table></div>
+      </div>
+
+      <!-- Full task table -->
+      <div class="card-title">All Tasks — ${custodian}${agentTaskFilter.size>0?' (filtered)':''}</div>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Trail ID</th><th>Customer</th><th>Task</th><th>Closed</th><th>Due</th><th>Departure</th><th>Status</th><th>Region</th></tr></thead>
+        <tbody>${data.sort((a,b)=>datePart(b.closed_at).localeCompare(datePart(a.closed_at))).map(d=>`<tr>
+          <td><strong>${d.trail_id}</strong></td>
+          <td>${d.customer_name||'-'}</td>
+          <td><span class="badge blue">${(d.task_name||'').replace(/_/g,' ')}</span></td>
+          <td>${fmtDate(datePart(d.closed_at))}</td>
+          <td>${fmtDate(datePart(d.due_at))}</td>
+          <td>${fmtDate(datePart(d.departure_date))}</td>
+          <td>${String(d.is_overdue)==='1'?'<span class="badge red">Overdue</span>':'<span class="badge green">On Time</span>'}</td>
+          <td>${d.sub_region||'-'}</td>
+        </tr>`).join('')}</tbody>
+      </table></div>
+    </div>`;
+
+  // Charts
+  destroyChart('ag-d-'+uid);
+  destroyChart('ag-t-'+uid);
+
+  charts['ag-d-'+uid] = new Chart(document.getElementById('ch-ag-d-'+uid), {
+    type: 'bar',
+    data: { labels: days.map(fmtDate), datasets:[{ label:'Closed', data:days.map(d=>dailyMap[d]), backgroundColor:'#2563eb', borderRadius:4 }] },
+    options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}},
+      scales:{ x:{ticks:{color:'#6b7280',font:{size:10}},grid:{color:'#e5e7eb'}}, y:{ticks:{color:'#6b7280',stepSize:1},grid:{color:'#e5e7eb'},beginAtZero:true} } }
+  });
+
+  charts['ag-t-'+uid] = new Chart(document.getElementById('ch-ag-t-'+uid), {
+    type: 'doughnut',
+    data: { labels: Object.keys(taskMap).map(t=>t.replace(/_/g,' ')),
+      datasets:[{ data:Object.values(taskMap), backgroundColor:['#2563eb','#16a34a','#dc2626','#d97706','#7c3aed','#0891b2','#be185d'], borderColor:'#fff', borderWidth:2 }] },
+    options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'right', labels:{color:'#1a1d23',font:{size:11}}}} }
+  });
+}
+
+function agentFilterTask(task, uid) {
+  if (task === '__ALL__') {
+    agentTaskFilter = new Set();
+  } else {
+    // Toggle: if already selected and is the only one, go back to all
+    if (agentTaskFilter.has(task) && agentTaskFilter.size === 1) {
+      agentTaskFilter = new Set();
+    } else if (agentTaskFilter.has(task)) {
+      agentTaskFilter.delete(task);
+    } else {
+      agentTaskFilter.add(task);
+    }
+  }
+  renderAgentDetail(agentCurrentCustodian);
+}
+
+// ═══════════════════════════════════════════════
+//  TASK ANALYSIS
+// ═══════════════════════════════════════════════
+function renderTasks() {
+  const data=filteredData;
+  const taskMap={};
+  data.forEach(d=>{
+    const t=d.task_name||'Unknown';
+    if(!taskMap[t]) taskMap[t]={total:0,onTime:0,overdue:0,custs:new Set()};
+    taskMap[t].total++;
+    if(String(d.is_overdue)==='0') taskMap[t].onTime++; else taskMap[t].overdue++;
+    if(d.trip_custodian_name) taskMap[t].custs.add(d.trip_custodian_name);
+  });
+  const rows=Object.entries(taskMap).sort((a,b)=>b[1].total-a[1].total);
+
+  document.getElementById('page-tasks').innerHTML=`
+    <div class="card mb"><div class="card-title">Task Summary</div>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Task</th><th>Total</th><th>On Time</th><th>Overdue</th><th>OT %</th><th>Custodians</th></tr></thead>
+        <tbody>${rows.map(([task,s])=>{
+          const p=pct(s.onTime,s.total);
+          return `<tr>
+            <td><strong>${task.replace(/_/g,' ')}</strong></td>
+            <td class="num">${s.total}</td>
+            <td><span class="badge green">✓ ${s.onTime}</span></td>
+            <td><span class="badge red">✕ ${s.overdue}</span></td>
+            <td><span class="badge ${p>=70?'green':p>=40?'blue':'red'}">${p}%</span></td>
+            <td>${s.custs.size}</td>
+          </tr>`;
+        }).join('')}</tbody>
+      </table></div>
+    </div>
+    <div class="grid-2 mb">
+      <div class="card"><div class="card-title">On Time vs Overdue by Task</div><div class="chart-wrap"><canvas id="ch-t-ot"></canvas></div></div>
+      <div class="card"><div class="card-title">Task Volume</div><div class="chart-wrap"><canvas id="ch-t-vol"></canvas></div></div>
+    </div>`;
+
+  destroyChart('t-ot');
+  charts['t-ot']=new Chart(document.getElementById('ch-t-ot'),{
+    type:'bar',
+    data:{labels:rows.map(([t])=>t.replace(/_/g,' ')),
+      datasets:[{label:'On Time',data:rows.map(([,s])=>s.onTime),backgroundColor:'#16a34a',borderRadius:4},
+                {label:'Overdue',data:rows.map(([,s])=>s.overdue),backgroundColor:'#dc2626',borderRadius:4}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'#1a1d23'}}},
+      scales:{x:{ticks:{color:'#6b7280'},grid:{color:'#e5e7eb'}},y:{ticks:{color:'#6b7280'},grid:{color:'#e5e7eb'},beginAtZero:true}}}
+  });
+  destroyChart('t-vol');
+  charts['t-vol']=new Chart(document.getElementById('ch-t-vol'),{
+    type:'pie',
+    data:{labels:rows.map(([t])=>t.replace(/_/g,' ')),
+      datasets:[{data:rows.map(([,s])=>s.total),backgroundColor:['#2563eb','#16a34a','#dc2626','#d97706','#7c3aed','#0891b2','#be185d'],borderColor:'#fff',borderWidth:2}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'#1a1d23',font:{size:11}}}}}
+  });
+}
+
+// ═══════════════════════════════════════════════
+//  NINER CHECK
+// ═══════════════════════════════════════════════
+let ninerFilter = 'all'; // 'all' | 'ontime' | 'overdue'
+
+function renderNiner() {
+  const data=filteredData.filter(d=>d.task_name==='NINER_CHECK');
+  const allRows=data.map(d=>{
+    const closedDate=datePart(d.closed_at), bookedDate=datePart(d.tal_booked_date);
+    return {...d,_closedDate:closedDate,_bookedDate:bookedDate,_daysLate:daysBetween(bookedDate,closedDate)};
+  }).sort((a,b)=>(b._daysLate||0)-(a._daysLate||0));
+
+  const total=allRows.length;
+  const onTime=allRows.filter(r=>String(r.is_overdue)==='0').length;
+  const overdue=allRows.filter(r=>String(r.is_overdue)==='1').length;
+  const avgLate=overdue?Math.round(allRows.filter(r=>String(r.is_overdue)==='1'&&r._daysLate).reduce((s,r)=>s+r._daysLate,0)/overdue):0;
+
+  // Apply filter
+  const rows = ninerFilter==='ontime' ? allRows.filter(r=>String(r.is_overdue)==='0')
+             : ninerFilter==='overdue'? allRows.filter(r=>String(r.is_overdue)==='1')
+             : allRows;
+
+  const activeLabel = ninerFilter==='ontime'?'On Time only':ninerFilter==='overdue'?'Overdue only':'All';
+
+  document.getElementById('page-niner').innerHTML=`
+    <div style="font-size:12px;color:var(--muted);margin-bottom:12px">
+      💡 Click a KPI card to filter the table below
+    </div>
+    <div class="kpi-grid" style="margin-bottom:20px">
+      <div class="kpi" style="cursor:pointer;border:2px solid ${ninerFilter==='all'?'var(--accent)':'var(--border)'};${ninerFilter==='all'?'background:#f0f7ff':''}"
+           onclick="ninerFilter='all';renderNiner()">
+        <div class="kpi-lbl">All Tasks</div>
+        <div class="kpi-val blue">${total}</div>
+        <div class="kpi-sub">click to show all</div>
+      </div>
+      <div class="kpi" style="cursor:pointer;border:2px solid ${ninerFilter==='ontime'?'var(--green)':'var(--border)'};${ninerFilter==='ontime'?'background:#f0fdf4':''}"
+           onclick="ninerFilter='ontime';renderNiner()">
+        <div class="kpi-lbl">On Time ✓</div>
+        <div class="kpi-val green">${onTime}</div>
+        <div class="kpi-sub">${pct(onTime,total)}% — click to filter</div>
+      </div>
+      <div class="kpi" style="cursor:pointer;border:2px solid ${ninerFilter==='overdue'?'var(--red)':'var(--border)'};${ninerFilter==='overdue'?'background:#fff5f5':''}"
+           onclick="ninerFilter='overdue';renderNiner()">
+        <div class="kpi-lbl">Overdue ✕</div>
+        <div class="kpi-val red">${overdue}</div>
+        <div class="kpi-sub">${pct(overdue,total)}% — click to filter</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-lbl">Avg Days Late</div>
+        <div class="kpi-val red">${avgLate}d</div>
+        <div class="kpi-sub">overdue tasks only</div>
+      </div>
+    </div>
+    <div class="card"><div class="card-title">
+      Niner Check — TAL Booked vs Closed Date
+      <span style="margin-left:8px;font-size:12px;font-weight:400;color:var(--muted)">
+        Showing: <strong style="color:${ninerFilter==='ontime'?'var(--green)':ninerFilter==='overdue'?'var(--red)':'var(--accent)'}">${activeLabel}</strong>
+        · ${rows.length} record${rows.length!==1?'s':''}
+        ${ninerFilter!=='all'?`<button onclick="ninerFilter='all';renderNiner()" style="margin-left:8px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:2px 8px;cursor:pointer;font-size:11px;">✕ Clear filter</button>`:''}
+      </span>
+    </div>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Trail ID</th><th>Customer</th><th>Custodian</th><th>TAL Booked</th><th>Closed</th><th>Due</th><th>Days Late</th><th>Trip Status</th><th>Departure</th></tr></thead>
+        <tbody>${rows.map(r=>{
+          const isOD=String(r.is_overdue)==='1';
+          return `<tr>
+            <td><strong>${r.trail_id}</strong></td>
+            <td>${r.customer_name||'-'}</td>
+            <td>${r.trip_custodian_name||'-'}</td>
+            <td>${fmtDate(r._bookedDate)}</td>
+            <td>${fmtDate(r._closedDate)}</td>
+            <td>${fmtDate(datePart(r.due_at))}</td>
+            <td>${isOD?`<span class="badge red">${r._daysLate??'-'}d late</span>`:'<span class="badge green">On Time</span>'}</td>
+            <td><span class="badge blue">${r.trail_status||'-'}</span></td>
+            <td>${fmtDate(datePart(r.departure_date))}</td>
+          </tr>`;
+        }).join('')}</tbody>
+      </table></div>
+    </div>`;
+}
+
+// ═══════════════════════════════════════════════
+//  BY CUSTODIAN
+// ═══════════════════════════════════════════════
+function renderCustodian() {
+  const data=filteredData;
+  const custMap={};
+  data.forEach(d=>{
+    const c=d.trip_custodian_name||'Unknown';
+    if(!custMap[c]) custMap[c]={name:c,total:0,onTime:0,overdue:0,tasks:{},daily:{}};
+    custMap[c].total++;
+    if(String(d.is_overdue)==='0') custMap[c].onTime++; else custMap[c].overdue++;
+    custMap[c].tasks[d.task_name]=(custMap[c].tasks[d.task_name]||0)+1;
+    const dt=datePart(d.closed_at); if(dt) custMap[c].daily[dt]=(custMap[c].daily[dt]||0)+1;
+  });
+  const custs=Object.values(custMap).sort((a,b)=>b.total-a.total);
+
+  document.getElementById('page-custodian').innerHTML=`
+    <!-- 1. INDIVIDUAL AGENT CARDS — TOP -->
+    <div class="grid-2 mb">
+      ${custs.map(c=>{
+        const p=pct(c.onTime,c.total);
+        const topTask=Object.entries(c.tasks).sort((a,b)=>b[1]-a[1])[0];
+        const peakDay=Object.entries(c.daily).sort((a,b)=>b[1]-a[1])[0];
+        return `<div class="card">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+            <div style="font-size:15px;font-weight:700">${c.name}</div>
+            <span class="badge ${p>=70?'green':p>=40?'blue':'red'}">${p}% On Time</span>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:12px">
+            <div style="background:var(--surface2);border-radius:8px;padding:10px;text-align:center">
+              <div style="font-size:20px;font-weight:700;color:var(--accent)">${c.total}</div><div style="font-size:11px;color:var(--muted)">Total</div>
+            </div>
+            <div style="background:var(--green-bg);border-radius:8px;padding:10px;text-align:center">
+              <div style="font-size:20px;font-weight:700;color:var(--green)">${c.onTime}</div><div style="font-size:11px;color:var(--green)">On Time</div>
+            </div>
+            <div style="background:var(--red-bg);border-radius:8px;padding:10px;text-align:center">
+              <div style="font-size:20px;font-weight:700;color:var(--red)">${c.overdue}</div><div style="font-size:11px;color:var(--red)">Overdue</div>
+            </div>
+          </div>
+          <div style="font-size:12px;color:var(--muted)">Top task: <strong>${topTask?topTask[0].replace(/_/g,' ')+'  ('+topTask[1]+')':'-'}</strong></div>
+          <div style="font-size:12px;color:var(--muted);margin-top:3px">Peak day: <strong>${peakDay?fmtDate(peakDay[0])+' ('+peakDay[1]+' tasks)':'-'}</strong></div>
+        </div>`;
+      }).join('')}
+    </div>
+
+    <!-- 2. COMPARISON CHART — BELOW -->
+    <div class="card">
+      <div class="card-title">Custodian Performance Comparison</div>
+      <div class="chart-wrap" style="height:280px"><canvas id="ch-cust-cmp"></canvas></div>
+    </div>`;
+
+  destroyChart('cust-cmp');
+  charts['cust-cmp']=new Chart(document.getElementById('ch-cust-cmp'),{
+    type:'bar',
+    data:{labels:custs.map(c=>c.name),
+      datasets:[{label:'On Time',data:custs.map(c=>c.onTime),backgroundColor:'#16a34a',borderRadius:4},
+                {label:'Overdue',data:custs.map(c=>c.overdue),backgroundColor:'#dc2626',borderRadius:4}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'#1a1d23'}}},
+      scales:{x:{ticks:{color:'#6b7280'},grid:{color:'#e5e7eb'}},y:{ticks:{color:'#6b7280'},grid:{color:'#e5e7eb'},beginAtZero:true}}}
+  });
+}
+
+// ═══════════════════════════════════════════════
+//  RAW DETAIL
+// ═══════════════════════════════════════════════
+function renderDetail() {
+  const data=filteredData.slice(0,500);
+  document.getElementById('page-detail').innerHTML=`
+    <div class="card"><div class="card-title">Raw Data (${filteredData.length} rows · showing up to 500)</div>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Trail ID</th><th>Customer</th><th>Custodian</th><th>Task</th><th>Closed</th><th>Due</th><th>Departure</th><th>Trip Status</th><th>Overdue</th><th>Region</th></tr></thead>
+        <tbody>${data.map(d=>`<tr>
+          <td>${d.trail_id}</td><td>${d.customer_name||'-'}</td><td>${d.trip_custodian_name||'-'}</td>
+          <td><span class="badge blue">${(d.task_name||'').replace(/_/g,' ')}</span></td>
+          <td>${fmtDate(datePart(d.closed_at))}</td>
+          <td>${fmtDate(datePart(d.due_at))}</td>
+          <td>${fmtDate(datePart(d.departure_date))}</td>
+          <td><span class="badge blue">${d.trail_status||'-'}</span></td>
+          <td>${String(d.is_overdue)==='1'?'<span class="badge red">Overdue</span>':'<span class="badge green">On Time</span>'}</td>
+          <td>${d.sub_region||'-'}</td>
+        </tr>`).join('')}</tbody>
+      </table></div>
+    </div>`;
+}
+
+// ═══════════════════════════════════════════════
+//  DRILL MODAL
+// ═══════════════════════════════════════════════
+function openDrill(custodian, date) {
+  const rows=filteredData.filter(d=>{
+    const dtMatch=datePart(d.closed_at)===date;
+    return custodian?dtMatch&&d.trip_custodian_name===custodian:dtMatch;
+  });
+  const onTime=rows.filter(r=>String(r.is_overdue)==='0').length;
+  const overdue=rows.filter(r=>String(r.is_overdue)==='1').length;
+
+  document.getElementById('drill-title').textContent=custodian?`${custodian} — ${fmtDate(date)}`:`All Agents — ${fmtDate(date)}`;
+  document.getElementById('drill-sub').textContent=`${rows.length} task${rows.length!==1?'s':''} closed`;
+
+  document.getElementById('drill-kpis').innerHTML=`
+    <div class="modal-kpi"><div class="v" style="color:var(--accent)">${rows.length}</div><div class="l">Total Closed</div></div>
+    <div class="modal-kpi"><div class="v" style="color:var(--green)">${onTime}</div><div class="l">On Time</div></div>
+    <div class="modal-kpi"><div class="v" style="color:var(--red)">${overdue}</div><div class="l">Overdue</div></div>
+    <div class="modal-kpi"><div class="v" style="color:var(--accent)">${pct(onTime,rows.length)}%</div><div class="l">OT Rate</div></div>`;
+
+  document.getElementById('drill-table').innerHTML=`
+    <table><thead><tr>
+      <th>Trail ID</th>${!custodian?'<th>Custodian</th>':''}
+      <th>Customer</th><th>Task</th><th>Closed</th><th>Due</th><th>Status</th><th>Region</th>
+    </tr></thead>
+    <tbody>${rows.map(d=>`<tr>
+      <td><strong>${d.trail_id}</strong></td>
+      ${!custodian?`<td>${d.trip_custodian_name||'-'}</td>`:''}
+      <td>${d.customer_name||'-'}</td>
+      <td><span class="badge blue">${(d.task_name||'').replace(/_/g,' ')}</span></td>
+      <td>${fmtDate(datePart(d.closed_at))}</td>
+      <td>${fmtDate(datePart(d.due_at))}</td>
+      <td>${String(d.is_overdue)==='1'?'<span class="badge red">Overdue</span>':'<span class="badge green">On Time</span>'}</td>
+      <td>${d.sub_region||'-'}</td>
+    </tr>`).join('')}</tbody></table>`;
+
+  document.getElementById('drill-modal').classList.add('open');
+}
+function closeDrill(){document.getElementById('drill-modal').classList.remove('open');}
+document.addEventListener('click',e=>{if(e.target.id==='drill-modal')closeDrill();});
+
+// ═══════════════════════════════════════════════
+//  TOAST
+// ═══════════════════════════════════════════════
+function showToast(msg,err=false){
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.className='toast show'+(err?' err':'');
+  setTimeout(()=>t.className='toast',3000);
+}
+
+// ═══════════════════════════════════════════════
+//  BOOT
+// ═══════════════════════════════════════════════
+window.onload = () => {
+  buildMultiSelects();
+  loadStoredData(); // async — shows loading spinner then fetches cloud data
+};
+</script>
+</body>
+</html>
